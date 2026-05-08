@@ -8,6 +8,7 @@ from qiskit.visualization import plot_histogram
 import numpy as np
 import os
 import pathlib
+import matplotlib.pyplot as plt
 
 ibm_token = os.getenv("IBM_QUANTUM_TOKEN")
 
