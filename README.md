@@ -17,6 +17,7 @@ dbq = DB_QITE(
     initial_state = None,    # initial_state array-like, default None
     time_step = s,           # time step. list or a single value
 )
+
 circuit = dbq.create_circuit(
     num_steps,               # #iterations
     random_u0,               # boolean. U0 is random or not

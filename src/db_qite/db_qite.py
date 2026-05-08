@@ -11,10 +11,11 @@ import pathlib
 
 ibm_token = os.getenv("IBM_QUANTUM_TOKEN")
 
-try:
-    QiskitRuntimeService.save_account(channel="ibm_quantum_platform", token=ibm_token)
-except accounts.exceptions.AccountAlreadyExistsError:
-    print("IBM Quantum account already exists. Using existing account.")
+if ibm_token:
+    try:
+        QiskitRuntimeService.save_account(channel="ibm_quantum_platform", token=ibm_token)
+    except accounts.exceptions.AccountAlreadyExistsError:
+        print("IBM Quantum account already exists. Using existing account.")
 
 class DB_QITE:
     U_evolution = None
