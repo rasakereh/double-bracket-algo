@@ -1,5 +1,6 @@
 from qiskit import QuantumCircuit, transpile
 from qiskit.circuit.library import HamiltonianGate, IGate
+from qiskit.quantum_info import Operator
 from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, EstimatorV2 as Estimator, accounts
 from qiskit.converters import circuit_to_dag
