@@ -4,7 +4,7 @@ Implementation of [DB-QITE](https://doi.org/10.48550/arXiv.2412.04554) (by Gluza
 
 ## Installation
 ```bash
-pip install qiskit-dbqite
+pip install db-qite
 ```
 
 ## Usage
