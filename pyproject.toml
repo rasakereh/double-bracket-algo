@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qiskit-db-qite"
+version = "0.0.1"
+authors = [
+  { name="Reza", email="rasakereh.8@gmail.com" },
+]
+description = "Implements Double-Bracket Quantum Imaginary Time Evolution (DB-QITE) in Qiskit"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "qiskit >= 2.4.1",
+    "qiskit_aer >= 0.17.2",
+    "qiskit-ibm-runtime >= 0.46.1",
+    "pylatexenc >= 2.10",
+    "matplotlib >= 3.10.9",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/rasakereh/double-bracket-algo"
