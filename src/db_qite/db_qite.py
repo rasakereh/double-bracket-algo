@@ -145,9 +145,10 @@ class CircuitRunner:
     def draw_transpiled_circuits(self):
         for i, circuit in enumerate(self.circuits):
             print(f"Circuit {circuit.name} transpiled for backend {self.backend.name} with depth {circuit.depth()}, num_qubits {self._get_active_qubit_count(circuit)}, and size {circuit.size()}")
-            circuit_to_draw = circuit#.decompose() if self.simulation else circuit
-            circuit_to_draw.draw('mpl', filename=f'{self.output_dir}/transpiled_circuit_{i}.png')
-            plt.close()
+            if circuit.size() < 500:
+                circuit_to_draw = circuit#.decompose() if self.simulation else circuit
+                circuit_to_draw.draw('mpl', filename=f'{self.output_dir}/transpiled_circuit_{i}.png')
+                plt.close()
     
     def _run_estimate_energy(self):
         self.jobs = self.estimator.run(
