@@ -152,7 +152,10 @@ class CircuitRunner:
     
     def _run_estimate_energy(self):
         self.jobs = self.estimator.run(
-            [(circuit, self.hamiltonian) for circuit in self.circuits],
+            [(
+                circuit,
+                self.hamiltonian if self.simulation else self.hamiltonian.apply_layout(circuit.layout)
+            ) for circuit in self.circuits],
         )
         self.results = [
             (float(res.data.evs), float(res.data.stds))
