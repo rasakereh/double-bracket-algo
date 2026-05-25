@@ -1,6 +1,6 @@
 from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.library import HamiltonianGate, IGate
-from qiskit.quantum_info import Operator
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import Pauli, SparsePauliOp, Operator
 from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, EstimatorV2 as Estimator, accounts
 from qiskit.converters import circuit_to_dag
@@ -24,18 +24,34 @@ class DB_QITE:
     multiple_s = True
 
     def __init__(self, hamiltonian, initial_state, time_step):
-        self.hamiltonian = hamiltonian
+        if isinstance(hamiltonian, (SparsePauliOp, Pauli)):
+            self.hamiltonian = hamiltonian
+        else:
+            self.hamiltonian = SparsePauliOp.from_operator(Operator(hamiltonian))
         self.initial_state = initial_state
         self.time_step = time_step
         if isinstance(time_step, float):
             self.multiple_s = False
             self.e_is, self.e_P0 = self._create_rotation_projection(time_step)
     
+    def _create_evolution_gate(self, s):
+        return PauliEvolutionGate(self.hamiltonian, time=-s**0.5, label='$e^{i\\sqrt{s}H}$')
+    
+    def _create_projection_gate(self, s):
+        projection_circuit = QuantumCircuit(self.hamiltonian.num_qubits)
+        for i in range(self.hamiltonian.num_qubits):
+            projection_circuit.x(i)
+        projection_circuit.mcp(s**0.5, [0], range(1, self.hamiltonian.num_qubits))  # Control qubits first, then target
+        for i in range(self.hamiltonian.num_qubits):
+            projection_circuit.x(i)
+        projection_circuit.name = f"projection_circuit"
+
+        projection_gate = projection_circuit.to_gate(label='$e^{i\\sqrt{s}|0><0|}$')
+        return projection_gate
+    
     def _create_rotation_projection(self, s):
-        e_is = HamiltonianGate(self.hamiltonian, time=-s**.5, label='$e^{i\\sqrt{s}H}$')
-        P0 = np.zeros(self.hamiltonian.dim)
-        P0[0, 0] = 1
-        e_P0 = HamiltonianGate(P0, time=-s**.5, label='$e^{i\\sqrt{s}|0><0|}$')
+        e_is = self._create_evolution_gate(s)
+        e_P0 = self._create_projection_gate(s)
 
         return e_is, e_P0
 
