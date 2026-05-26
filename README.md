@@ -16,6 +16,7 @@ dbq = DB_QITE(
     hamiltonian = H,         # hamiltonian: `SparsePauliOp`
     initial_state = None,    # initial_state array-like, default None
     time_step = s,           # time step. list or a single value
+    trotterization = True,   # whether to approx H, default True
 )
 
 circuit = dbq.create_circuit(
