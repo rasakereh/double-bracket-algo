@@ -64,6 +64,12 @@ class CircuitRunner:
         self.eigenvalues = eigenvals
         self.eigenvectors = eigvecs
 
+        for eigval, eigvec in zip(self.eigenvalues, self.eigenvectors.T):
+            print(f"Eigenvalue: {eigval:.2f}")
+            print(f"closest state: |{np.argmax(np.abs(eigvec))}>")
+            print(f"~Eigenvector: {np.abs(eigvec)}\n")
+            print("-" * 40)
+
         return self.eigenvalues, self.eigenvectors
     
     @staticmethod
