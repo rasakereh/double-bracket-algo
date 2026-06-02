@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "db-qite"
-version = "0.0.6"
+version = "0.0.7"
 authors = [
   { name="Reza", email="rasakereh.8@gmail.com" },
 ]
@@ -17,6 +17,8 @@ dependencies = [
     "qiskit-ibm-runtime >= 0.46.1",
     "pylatexenc >= 2.10",
     "matplotlib >= 3.10.9",
+    "imageio >= 2.37.3",
+    "tqdm >= 4.67.3",
 ]
 
 [project.urls]
