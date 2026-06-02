@@ -5,19 +5,18 @@ import numpy as np
 import pathlib
 import matplotlib.pyplot as plt
 
-from .utils import create_evolution_gate, create_zero_projection_gate
+from .utils import create_evolution_gate, create_zero_projection_gate, create_monotonic_diagonal
 from .circuit_runner import CircuitRunner
 
-class DB_QITE:
+class DB_Sorter:
     multiple_s = True
 
-    def __init__(self, hamiltonian, initial_state, time_step, trotterization=True):
+    def __init__(self, hamiltonian, time_step, trotterization=True):
         self.trotterization = trotterization
         if isinstance(hamiltonian, (SparsePauliOp, Pauli)) or not trotterization:
             self.hamiltonian = hamiltonian
         else:
             self.hamiltonian = SparsePauliOp.from_operator(Operator(hamiltonian))
-        self.initial_state = initial_state
         self.time_step = time_step
         if isinstance(time_step, float):
             self.multiple_s = False
@@ -25,32 +24,15 @@ class DB_QITE:
         
     def _create_rotation_projection(self, s):
         e_is = create_evolution_gate(s, self.hamiltonian, use_pauli=self.trotterization)
-        e_P0 = create_zero_projection_gate(s, self.hamiltonian.num_qubits, use_mcp=self.trotterization)
+        # e_P0 = create_zero_projection_gate(s, self.hamiltonian.num_qubits, use_mcp=self.trotterization, add_noise=True)
+        e_P0 = create_monotonic_diagonal(s, self.hamiltonian.num_qubits)
 
         return e_is, e_P0
 
-    def create_U_k(self, k, s=None, random_u0=False):
+    def create_U_k(self, k, s=None):
         if k == 0:
             U0 = QuantumCircuit(self.hamiltonian.num_qubits)
-            if self.initial_state is not None:
-                argmax = np.argmax(self.initial_state)+1
-                closest_qubit = int(np.ceil(np.log2(argmax)))
-                for n in range(self.hamiltonian.num_qubits):
-                    if closest_qubit == n:
-                        U0.x(n)
-                    else:
-                        U0.id(n)
-            elif random_u0:
-                # np.random.seed(42)
-                # for n in range(self.hamiltonian.num_qubits):
-                #     if np.random.rand() < 0.5:
-                #         U0.x(n)
-                #     else:
-                #         U0.id(n)
-                for n in range(self.hamiltonian.num_qubits):
-                    U0.h(n)
-            else:
-                U0.id(range(self.hamiltonian.num_qubits))
+            U0.id(range(self.hamiltonian.num_qubits))
             return U0
         
         if self.multiple_s and s is None:
@@ -59,36 +41,35 @@ class DB_QITE:
             e_is, e_P0 = self.e_is, self.e_P0
         else:
             e_is, e_P0 = self._create_rotation_projection(s)
+        
+        e_P0_inverse = e_P0.inverse()
+        e_P0_inverse.label = '$e^{-i\\sqrt{s}|0><0|}$'
 
-        U_k_1 = self.create_U_k(k - 1, s, random_u0).to_gate(label=f'$U_{k-1}$')
+        U_k_1 = self.create_U_k(k - 1, s).to_gate(label=f'$U_{k-1}$')
         U_k_1_inverse = U_k_1.inverse()
         U_k_1_inverse.label = f'$U_{{{k-1}}}^\\dagger$'
-        e_is_inverse = e_is.inverse()
-        e_is_inverse.label = '$e^{-i\\sqrt{s}H}$'
         U_k = QuantumCircuit(self.hamiltonian.num_qubits)
+        U_k.append(e_P0_inverse, range(self.hamiltonian.num_qubits))
         U_k.append(U_k_1, range(self.hamiltonian.num_qubits))
-        U_k.append(e_is_inverse, range(self.hamiltonian.num_qubits))
+        U_k.append(e_is, range(self.hamiltonian.num_qubits))
         U_k.append(U_k_1_inverse, range(self.hamiltonian.num_qubits))
         U_k.append(e_P0, range(self.hamiltonian.num_qubits))
         U_k.append(U_k_1, range(self.hamiltonian.num_qubits))
-        U_k.append(e_is, range(self.hamiltonian.num_qubits))
         
         return U_k
     
-    def create_circuit(self, num_steps, random_u0):
+    def create_circuit(self, num_steps):
         circuit = QuantumCircuit(self.hamiltonian.num_qubits, self.hamiltonian.num_qubits)
-        circuit.append(self.create_U_k(num_steps, random_u0=random_u0), range(self.hamiltonian.num_qubits))
+        circuit.append(self.create_U_k(num_steps), range(self.hamiltonian.num_qubits))
         circuit.measure(range(self.hamiltonian.num_qubits), range(self.hamiltonian.num_qubits))
-        circuit.name = f'DB-QITE_{num_steps}_steps'
+        circuit.name = f'DB-Sorter_{num_steps}_steps'
         
         return circuit
 
 
-def db_qite_range(
+def db_sorter_range(
     hamiltonian,
-    initial_state,
     time_step,
-    random_u0,
     num_steps_range,
     backend="simulator",
     estimate_energy=True,
@@ -106,16 +87,16 @@ def db_qite_range(
 
     circuits = []
     for num_steps in num_steps_range:
-        dbq = DB_QITE(hamiltonian, initial_state, time_step, trotterization=(backend!="simulator"))
-        circuit = dbq.create_circuit(num_steps, random_u0)
-        circuit.decompose().draw('mpl', filename=f'{output_dir}/DB-QITE_{num_steps}_steps.png')
+        dbq = DB_Sorter(hamiltonian, time_step, trotterization=backend!="simulator")
+        circuit = dbq.create_circuit(num_steps)
+        circuit.decompose().draw('mpl', filename=f'{output_dir}/DB-Sorter_{num_steps}_steps.png')
         plt.close()
         circuits.append(circuit)
 
     runner = CircuitRunner(circuits, backend, estimate_energy, shots, hamiltonian, output_dir=output_dir)
 
     runner.draw_transpiled_circuits()
-
+    
     print(f"Running circuits...")
     results = runner.run()
     runner.draw_results()
