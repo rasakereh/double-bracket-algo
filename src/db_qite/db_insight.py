@@ -111,25 +111,3 @@ class DB_Insight:
         imageio.mimsave(filename, images, duration=num_steps**.5)
 
 
-# usage
-from qiskit_nature.second_q.drivers import PySCFDriver
-from qiskit_nature.second_q.mappers import JordanWignerMapper
-
-from qiskit.quantum_info import SparsePauliOp
-
-# Define the hamiltonian (H2 molecule)
-driver = PySCFDriver(atom="H 0 0 0; H 0 0 0.735", basis="sto3g")
-problem = driver.run()
-hamiltonian = problem.hamiltonian
-mapper = JordanWignerMapper()
-H = mapper.map(hamiltonian.second_q_op())
-
-# H = SparsePauliOp.from_list([("XXIZ", 1), ("XIZY", .5), ("YYZX", .5), ("IZYX", .25)])
-
-H = H.to_matrix()
-
-insight = DB_Insight(hamiltonian=H, step_size=0.5, inject_noise=True, name="H2 Molecule")
-insight.create_evolution_gif(num_steps=50)
-insight.create_DBI_evolution_gif(num_steps=50)
-
-
