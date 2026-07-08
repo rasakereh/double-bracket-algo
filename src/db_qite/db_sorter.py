@@ -1,11 +1,16 @@
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Pauli, SparsePauliOp, Operator
+from qiskit.quantum_info import Operator
 
 import numpy as np
 import pathlib
 import matplotlib.pyplot as plt
 
-from .utils import create_evolution_gate, create_zero_projection_gate, create_monotonic_diagonal
+from .utils import (
+    create_evolution_gate,
+    create_zero_projection_gate,
+    create_monotonic_diagonal,
+    to_sparse_pauli,
+)
 from .circuit_runner import CircuitRunner
 
 class DB_Sorter:
@@ -13,10 +18,7 @@ class DB_Sorter:
 
     def __init__(self, hamiltonian, time_step, trotterization=True):
         self.trotterization = trotterization
-        if isinstance(hamiltonian, (SparsePauliOp, Pauli)) or not trotterization:
-            self.hamiltonian = hamiltonian
-        else:
-            self.hamiltonian = SparsePauliOp.from_operator(Operator(hamiltonian))
+        self.hamiltonian = to_sparse_pauli(hamiltonian, convert=trotterization)
         self.time_step = time_step
         if isinstance(time_step, float):
             self.multiple_s = False

@@ -1,10 +1,16 @@
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate, HamiltonianGate
+from qiskit.synthesis import LieTrotter
+from qiskit.quantum_info import Pauli, SparsePauliOp, Operator
 import numpy as np
 
 def create_evolution_gate(s, H, use_pauli=True):
     if use_pauli:
-        return PauliEvolutionGate(H, time=-s**0.5, label='$e^{i\\sqrt{s}H}$')
+        reorder_synthesis = LieTrotter(reps=1, preserve_order=True)
+        op = H.copy()
+        commuting_groups = op.group_commuting(qubit_wise=True)
+        H = sum(commuting_groups)
+        return PauliEvolutionGate(H, time=-s**0.5, label='$e^{i\\sqrt{s}H}$', synthesis=reorder_synthesis)
     else:
         return HamiltonianGate(H, time=-s**0.5, label='$e^{i\\sqrt{s}H}$')
 
@@ -37,3 +43,8 @@ def create_monotonic_diagonal(s, num_qubits, ascending=True):
     monotonic_gate = monotonic_circuit.to_gate(label='MonotonicDiagonal')
 
     return monotonic_gate
+
+def to_sparse_pauli(H, convert):
+    if isinstance(H, (SparsePauliOp, Pauli)) or not convert:
+        return H
+    return SparsePauliOp.from_operator(Operator(H))

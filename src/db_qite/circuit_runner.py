@@ -1,5 +1,5 @@
 from qiskit import transpile
-from qiskit.quantum_info import Operator
+from qiskit.quantum_info import Operator, SparsePauliOp
 from qiskit_aer import AerSimulator
 from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, EstimatorV2 as Estimator, accounts
 from qiskit.converters import circuit_to_dag
@@ -20,7 +20,14 @@ def login_ibm_quantum():
             print("Logged in to IBM Quantum successfully.")
         except accounts.exceptions.AccountAlreadyExistsError:
             print("IBM Quantum account already exists. Using existing account.")
-            
+
+def get_ibm_runtime():
+    ibm_token = os.getenv("IBM_QUANTUM_TOKEN")
+
+    if ibm_token:
+        return QiskitRuntimeService(channel="ibm_quantum_platform", token=ibm_token)
+    else:
+        raise ValueError("Set IBM_QUANTUM_TOKEN environment variable to your API key")
 
 class CircuitRunner:
     def __init__(self, circuits, backend, estimate_energy, default_shots, hamiltonian=None, output_dir='outputs'):
@@ -31,32 +38,37 @@ class CircuitRunner:
         self.hamiltonian = hamiltonian
         self.output_dir = output_dir
         pathlib.Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        self.initial_circuits = circuits
         self.default_shots = default_shots
+        self.prepare_runtime(backend)
+        self.transpile_circuits()
+    
+    def prepare_runtime(self, backend):
         if backend != "simulator":
-            login_ibm_quantum()
+            service = get_ibm_runtime()
             self.simulation = False
         else:
             self.simulation = True
-
+        
         if self.simulation:
-            self.backend = AerSimulator()
+            max_qubit_cnt = max(circuit.num_qubits for circuit in self.initial_circuits)
+            sim_method = 'matrix_product_state' if max_qubit_cnt > 20 else 'statevector'
+            self.backend = AerSimulator(method=sim_method)
         elif isinstance(backend, str):
-            service = QiskitRuntimeService()
             self.backend = service.backend(backend)
         elif backend is not None:
             self.backend = backend
         else:
-            service = QiskitRuntimeService()
             self.backend = service.least_busy(simulator=False, operational=True)
             
-        if not self.simulation:
-            self.sampler = Sampler(self.backend)
-        else:
-            self.sampler = self.backend
+        self.sampler = Sampler(self.backend)
         
-        self.estimator = Estimator(mode=self.backend, options={"default_shots": default_shots})
-        self.circuits = [transpile(circuit, self.backend) for circuit in circuits]
-    
+        self.estimator = Estimator(mode=self.backend, options={"default_shots": self.default_shots})
+
+    def transpile_circuits(self):
+        self.circuits = [self._transpile_circuit(circuit) for circuit in self.initial_circuits]
+
+
     def result_by_eigensolver(self):
         if self.hamiltonian is None:
             raise ValueError("Hamiltonian must be provided to compute eigenvalues and eigenvectors")
@@ -87,13 +99,23 @@ class CircuitRunner:
                 circuit_to_draw.draw('mpl', filename=f'{self.output_dir}/transpiled_circuit_{i}.png')
                 plt.close()
     
+    def _prepare_estimator_circuit(self, circuit_idx):
+        initial_circuit = self.initial_circuits[circuit_idx]
+        circuit = self.circuits[circuit_idx]
+        num_qubits = initial_circuit.num_qubits
+        num_ancillas = num_qubits - self.hamiltonian.num_qubits
+        ancilla_identity = SparsePauliOp("I" * num_ancillas)
+        full_hamiltonian = SparsePauliOp.from_operator(Operator(self.hamiltonian)).tensor(ancilla_identity)
+        full_hamiltonian = full_hamiltonian.apply_layout(circuit.layout)
+        
+        return (circuit, full_hamiltonian)
+    
+    def _transpile_circuit(self, circuit):
+        return transpile(circuit, backend=self.backend, optimization_level=3)
+
     def _run_estimate_energy(self):
-        self.jobs = self.estimator.run(
-            [(
-                circuit,
-                self.hamiltonian if self.simulation else self.hamiltonian.apply_layout(circuit.layout)
-            ) for circuit in self.circuits],
-        )
+        jobs_to_submiut = [self._prepare_estimator_circuit(idx) for idx, _ in enumerate(self.circuits)]
+        self.jobs = self.estimator.run(jobs_to_submiut)
         self.results = [
             (float(res.data.evs), float(res.data.stds))
             for res in self.jobs.result()
