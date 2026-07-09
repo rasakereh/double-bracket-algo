@@ -111,7 +111,14 @@ class CircuitRunner:
         return (circuit, full_hamiltonian)
     
     def _transpile_circuit(self, circuit):
-        return transpile(circuit, backend=self.backend, optimization_level=3)
+        return transpile(
+            circuit,
+            backend=self.backend,
+            layout_method='sabre',
+            routing_method='sabre',
+            optimization_level=3,
+            approximation_degree=1 if self.simulation else .999
+        )
 
     def _run_estimate_energy(self):
         jobs_to_submiut = [self._prepare_estimator_circuit(idx) for idx, _ in enumerate(self.circuits)]
@@ -154,7 +161,7 @@ class CircuitRunner:
         plt.ylabel('Estimated Energy')
         plt.title('Energy Estimates with Standard Deviation')
         plt.tight_layout()
-        plt.savefig(f'{self.output_dir}/energy_estimates.png')
+        plt.savefig(f'{self.output_dir}/energy_estimates_{self.circuits[0].name.split("_")[0]}.png')
         plt.close()
     
     def _draw_Z_measurement(self):

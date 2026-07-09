@@ -23,7 +23,7 @@ class QDP_QITE:
         self.time_step = time_step
         if isinstance(time_step, float):
             self.multiple_s = False
-            self.e_is, self.e_P0 = self._create_rotation_projection(time_step)
+            self.e_is = self._create_rotation(time_step)
     
     def get_curr_s(self, s, k):
         if self.multiple_s and s is None:
@@ -33,14 +33,12 @@ class QDP_QITE:
         else:
             return s
 
-    def _create_rotation_projection(self, s):
+    def _create_rotation(self, s):
         e_is = create_evolution_gate(s, self.hamiltonian, use_pauli=self.trotterization)
-        e_P0 = create_zero_projection_gate(s, self.hamiltonian.num_qubits, use_mcp=self.trotterization)
 
-        return e_is, e_P0
+        return e_is
 
     def create_U_k(self, k, s=None, random_u0=False):
-        print(f" {'='*10} Creating U_{k}... {'='*10}")
         if k == 0:
             U0 = QuantumCircuit(self.hamiltonian.num_qubits)
             if self.initial_state is not None:
@@ -61,16 +59,15 @@ class QDP_QITE:
         current_s = self.get_curr_s(s, k)
         
         if s is None and not self.multiple_s:
-            e_is, e_P0 = self.e_is, self.e_P0
+            e_is = self.e_is
         else:
-            e_is, e_P0 = self._create_rotation_projection(current_s)
+            e_is = self._create_rotation(current_s)
 
         num_qubits = self.hamiltonian.num_qubits
 
         U_k_1 = self.create_U_k(k - 1, s, random_u0).to_gate(label=f'$U_{k-1}$')
         e_is_inverse = e_is.inverse()
         e_is_inverse.label = '$e^{-i\\sqrt{s}H}$'
-        print(f"{'='*10} U_{k} => s={current_s} {'='*10}")
         qdp_gate = QDP_Gate(num_qubits, current_s**0.5).gate
         qdp_gate.label = 'QDP'
         total_qubits = U_k_1.num_qubits
