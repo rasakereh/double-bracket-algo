@@ -1,10 +1,11 @@
 # Double-Bracket Quantum Imaginary Time Evolution (DB-QITE)
 
-Implementation of [DB-QITE](https://doi.org/10.48550/arXiv.2412.04554) (by Gluza et al) and [Ground state by DBI](https://doi.org/10.22331/q-2024-04-09-1316) (by Gluza)
+Implementation of [DB-QITE](https://doi.org/10.48550/arXiv.2412.04554) (by Gluza et al), [QDP-QITE](https://doi.org/10.48550/arXiv.2403.09187) and [Ground state by DBI](https://doi.org/10.22331/q-2024-04-09-1316) (by Gluza)
 
-This repository implements two recently emerged algorithms for Hamiltonian ground state preparation:
+This repository implements three recently emerged algorithms for Hamiltonian ground state preparation:
 * **DB-sorter**: Based on DBI algorithm sorts the eigenvalues and eigenvectors and chooses the smallest one
 * **DB-QITE**: Mimics imaginary time evolution by approximating Hamiltonian commutation with `|0><0|`
+* **QDP-QITE**: Previous algorithm with slower depth growth using Quantum Dynamic Programming method
 
 ![Brockett Flow](./images/evolution.gif)
 ![DBI Flow](./images/dbi_evolution.gif)
@@ -32,9 +33,9 @@ circuit = dbq.create_circuit(
 )
 ```
 
-#### DB-QITE
+#### DB-QITE (or QDP-QITE)
 ```python
-from db_qite import DB_QITE
+from db_qite import DB_QITE # or QDP_QITE
 
 dbq = DB_QITE(
     hamiltonian = H,         # hamiltonian: `SparsePauliOp`
@@ -65,9 +66,9 @@ runner, results = db_sorter_range(
 )
 ```
 
-#### DB-QITE
+#### DB-QITE (or QDP-QITE)
 ```python
-from db_qite import db_qite_range
+from db_qite import db_qite_range # or qdp_qite_range
 
 runner, results = db_qite_range(
     hamiltonian=H,

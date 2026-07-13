@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "db-qite"
-version = "0.0.8"
+version = "0.0.9"
 authors = [
   { name="Reza", email="rasakereh.8@gmail.com" },
 ]
-description = "Implements Double-Bracket Quantum Imaginary Time Evolution (DB-QITE) in Qiskit"
+description = "Implements Double-Bracket Quantum Imaginary Time Evolution (DB-QITE) and other related algorithms in Qiskit"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
