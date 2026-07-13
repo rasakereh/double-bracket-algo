@@ -34,13 +34,8 @@ class DB_QITE:
         if k == 0:
             U0 = QuantumCircuit(self.hamiltonian.num_qubits)
             if self.initial_state is not None:
-                argmax = np.argmax(self.initial_state)+1
-                closest_qubit = int(np.ceil(np.log2(argmax)))
-                for n in range(self.hamiltonian.num_qubits):
-                    if closest_qubit == n:
-                        U0.x(n)
-                    else:
-                        U0.id(n)
+                assert isinstance(self.initial_state, QuantumCircuit), "initial_state must be a quantum circuit"
+                U0 = self.initial_state
             elif random_u0:
                 # np.random.seed(42)
                 # for n in range(self.hamiltonian.num_qubits):
