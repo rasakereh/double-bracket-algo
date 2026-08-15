@@ -3,7 +3,7 @@
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 
-from db_qite import qdp_qite_range, db_qite_range, db_sorter_range, DB_Insight
+from db_qite import db_range_runner, DB_Insight
 
 # Define the hamiltonian (H2 molecule)
 driver = PySCFDriver(atom="H 0 0 0; H 0 0 0.735", basis="sto3g")
@@ -12,40 +12,17 @@ hamiltonian = problem.hamiltonian
 mapper = JordanWignerMapper()
 H = mapper.map(hamiltonian.second_q_op())
 
-# QDP-QITE
-runner, results = qdp_qite_range(
-    hamiltonian=H,
-    initial_state=None,
-    time_step=.5,
-    random_u0=False,
-    num_steps_range=[1, 2, 3, 4],
-    backend="ibm_kingston",
-    estimate_energy=True,
-    shots=1024,
-)
-
-
-# DB-QITE
-runner, results = db_qite_range(
-    hamiltonian=H,
-    initial_state=None,
-    time_step=.5,
-    random_u0=True,
-    num_steps_range=[1, 2, 3],
-    backend="simulator",
-    estimate_energy=True,
-    shots=1024
-)
-
-# DB-Sorter
-runner, results = db_sorter_range(
-    hamiltonian=H,
-    time_step=.3,
-    num_steps_range=[1, 2, 3],
-    backend=None, # Uses real quantum machine
-    estimate_energy=True,
-    shots=1024
-)
+for method in ["db_qite", "db_sorter", "qdp_qite"]:
+    runner, results = db_range_runner(
+        hamiltonian=H,
+        initial_state=None,
+        time_step=.5,
+        num_steps_range=[1, 2, 3],
+        backend="simulator",
+        estimate_energy=True,
+        shots=1024,
+        method=method
+    )
 
 
 # Visualizations

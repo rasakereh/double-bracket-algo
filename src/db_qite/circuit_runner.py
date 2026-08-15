@@ -10,6 +10,10 @@ import os
 import pathlib
 import matplotlib.pyplot as plt
 
+from .db_qite import DB_QITE
+from .db_sorter import DB_Sorter
+from .qdp_qite import QDP_QITE
+
 def login_ibm_quantum():
     ibm_token = os.getenv("IBM_QUANTUM_TOKEN")
 
@@ -177,4 +181,54 @@ class CircuitRunner:
             self._draw_estimate_energy()
         else:
             self._draw_Z_measurement()
+
+
+def db_range_runner(
+    hamiltonian,
+    time_step,
+    num_steps_range,
+    initial_state=None,
+    backend="simulator",
+    estimate_energy=True,
+    shots=1024,
+    output_dir='outputs',
+    method="db_qite"
+):
+    assert method in ["db_qite", "db_sorter", "qdp_qite"], f"Unknown method: {method}"
+
+    db_class = {
+        "db_qite": DB_QITE,
+        "db_sorter": DB_Sorter,
+        "qdp_qite": QDP_QITE
+    }[method]
+    
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    # heatmap of the hamiltonian if the number of qubits is small enough
+    if hamiltonian.num_qubits <= 10:
+        plt.imshow(np.abs(Operator(hamiltonian).data), cmap='viridis')
+        plt.colorbar()
+        plt.title("Hamiltonian Matrix")
+        plt.savefig(f'{output_dir}/hamiltonian_matrix.png')
+        plt.close()
+
+    circuits = []
+    for num_steps in num_steps_range:
+        db_circuit = db_class(hamiltonian, initial_state, time_step, trotterization=True)
+        circuit = db_class.create_circuit(num_steps)
+        circuit.name = f"{method}_{num_steps}_steps"
+        circuit.decompose().draw('mpl', filename=f'{output_dir}/QDP-QITE_{num_steps}_steps.png')
+        plt.close()
+        circuits.append(circuit)
+
+    runner = CircuitRunner(circuits, backend, estimate_energy, shots, hamiltonian, output_dir=output_dir)
+
+    runner.draw_transpiled_circuits()
+
+    print(f"Running circuits...")
+    results = runner.run()
+    runner.draw_results()
+    
+    return runner, results
+
 
