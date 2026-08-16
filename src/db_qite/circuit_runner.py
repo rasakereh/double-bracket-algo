@@ -166,7 +166,8 @@ class CircuitRunner:
         plt.ylabel('Estimated Energy')
         plt.title('Energy Estimates with Standard Deviation')
         plt.tight_layout()
-        plt.savefig(f'{self.output_dir}/energy_estimates_{self.circuits[0].name.split("_")[0]}.png')
+        method = '_'.join(self.circuits[0].name.split("_")[:-2])
+        plt.savefig(f'{self.output_dir}/energy_estimates_{method}.png')
         plt.close()
     
     def _draw_Z_measurement(self):
@@ -194,6 +195,22 @@ def db_range_runner(
     output_dir='outputs',
     method="db_qite"
 ):
+    """
+    Run the specific DB algorithm for a range of time steps.
+
+    Args:
+        hamiltonian (qiskit.SparsePauliOp | qiskit.Operator | np.ndarray): The Hamiltonian operator.
+        time_step (float|list[float]): The time step(s) for the evolution.
+        num_steps_range (list[int]): A list of number of steps to run.
+        initial_state (qiskit.QuantumCircuit): The circuit to prepare the initial state for the circuit.
+        backend (str | qiskit.BaseBackend | None): The backend to use for simulation. If None, the least busy backend will be used. If "simulator", the proper simulator will be used.
+        estimate_energy (bool): Whether to estimate the energy or measure the final state.
+        shots (int): The number of shots for each measurement.
+        output_dir (str): The directory to save the output files.
+
+    Returns:
+        The runner and the results.
+    """
     assert method in ["db_qite", "db_sorter", "qdp_qite"], f"Unknown method: {method}"
 
     db_class = {
@@ -201,6 +218,11 @@ def db_range_runner(
         "db_sorter": DB_Sorter,
         "qdp_qite": QDP_QITE
     }[method]
+
+    trotterization = False if backend == "simulator" else True
+    if method == "qdp_qite":
+        trotterization = True
+    measure = not estimate_energy
     
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -214,10 +236,10 @@ def db_range_runner(
 
     circuits = []
     for num_steps in num_steps_range:
-        db_circuit = db_class(hamiltonian, initial_state, time_step, trotterization=True)
-        circuit = db_class.create_circuit(num_steps)
+        db_circuit = db_class(hamiltonian, time_step, trotterization=trotterization, measure=measure, initial_state=initial_state)
+        circuit = db_circuit.create_circuit(num_steps)
         circuit.name = f"{method}_{num_steps}_steps"
-        circuit.decompose().draw('mpl', filename=f'{output_dir}/QDP-QITE_{num_steps}_steps.png')
+        circuit.decompose().draw('mpl', filename=f'{output_dir}/{method}_{num_steps}_steps.png')
         plt.close()
         circuits.append(circuit)
 
@@ -226,6 +248,7 @@ def db_range_runner(
     runner.draw_transpiled_circuits()
 
     print(f"Running circuits...")
+    # results = None
     results = runner.run()
     runner.draw_results()
     

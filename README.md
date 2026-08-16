@@ -1,4 +1,4 @@
-# Double-Bracket Quantum Imaginary Time Evolution (DB-QITE)
+# Double-Bracket Methods for Ground State Preparation
 
 Implementation of [DB-QITE](https://doi.org/10.48550/arXiv.2412.04554) (by Gluza et al), [QDP-QITE](https://doi.org/10.48550/arXiv.2403.09187) and [Ground state by DBI](https://doi.org/10.22331/q-2024-04-09-1316) (by Gluza)
 

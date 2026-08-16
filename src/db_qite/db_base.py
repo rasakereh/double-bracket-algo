@@ -15,13 +15,14 @@ class DB_Base(ABC):
 
     _multiple_s = True
 
-    def __init__(self, hamiltonian, time_step, trotterization=True, initial_state=None):
+    def __init__(self, hamiltonian, time_step, trotterization=True, measure=False, initial_state=None):
         """Initialize the DB_Base class.
 
         Args:
             hamiltonian (qiskit.SparsePauliOp | qiskit.Operator | np.ndarray): The Hamiltonian of the system.
             time_step (float | list[float]): The time step(s) for the evolution. If a list is provided, it should have the same length as the number of steps in the evolution.
             trotterization (bool, optional): Whether to use Trotterization. Defaults to True.
+            measure (bool, optional): Whether to measure the final state. Defaults to False.
             initial_state (qiskit.QuantumCircuit | None, optional): The circuit that prepares the initial state of the system. If None, the initial state will be |0>^n . Defaults to None.
         """
 
@@ -29,6 +30,7 @@ class DB_Base(ABC):
         self.hamiltonian = to_sparse_pauli(hamiltonian, convert=trotterization)
         self.initial_state = initial_state
         self.time_step = time_step
+        self.measure = measure
         if isinstance(time_step, float):
             self._multiple_s = False
             self.e_is, self.e_P0 = self._create_auxiliary_gates(time_step)
@@ -112,8 +114,8 @@ class DB_Base(ABC):
         total_qubits = U_k.num_qubits
         circuit = QuantumCircuit(total_qubits, self.hamiltonian.num_qubits)
         circuit.append(U_k, range(total_qubits))
-        circuit.measure(range(self.hamiltonian.num_qubits), range(self.hamiltonian.num_qubits))
-        circuit.name = f'QDP-QITE_{num_steps}_steps'
+        if self.measure:
+            circuit.measure(range(self.hamiltonian.num_qubits), range(self.hamiltonian.num_qubits))
         
         return circuit
 

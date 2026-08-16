@@ -27,6 +27,7 @@ class QDP_QITE(DB_Base):
             return self.create_U_0()
         
         e_is, _ = self.get_auxiliary_gates(s, k)
+        current_s = self.get_curr_s(s, k)
 
         num_qubits = self.hamiltonian.num_qubits
 
