@@ -19,7 +19,7 @@ class DB_Sorter(DB_Base):
 
     def _create_auxiliary_gates(self, s):
         e_is = create_evolution_gate(s, self.hamiltonian, use_pauli=self.trotterization)
-        e_P0 = create_monotonic_diagonal(s, self.hamiltonian.num_qubits)
+        e_P0 = create_monotonic_diagonal(s, self.num_qubits, hadamard_basis=self.hadamard_basis)
 
         return e_is, e_P0
 
@@ -35,13 +35,13 @@ class DB_Sorter(DB_Base):
         U_k_1 = self.create_U_k(k - 1, s).to_gate(label=f'$U_{k-1}$')
         U_k_1_inverse = U_k_1.inverse()
         U_k_1_inverse.label = f'$U_{{{k-1}}}^\\dagger$'
-        U_k = QuantumCircuit(self.hamiltonian.num_qubits)
-        U_k.append(e_P0_inverse, range(self.hamiltonian.num_qubits))
-        U_k.append(U_k_1, range(self.hamiltonian.num_qubits))
-        U_k.append(e_is, range(self.hamiltonian.num_qubits))
-        U_k.append(U_k_1_inverse, range(self.hamiltonian.num_qubits))
-        U_k.append(e_P0, range(self.hamiltonian.num_qubits))
-        U_k.append(U_k_1, range(self.hamiltonian.num_qubits))
+        U_k = QuantumCircuit(self.num_qubits)
+        U_k.append(e_P0_inverse, range(self.num_qubits))
+        U_k.append(U_k_1, range(self.num_qubits))
+        U_k.append(e_is, range(self.num_qubits))
+        U_k.append(U_k_1_inverse, range(self.num_qubits))
+        U_k.append(e_P0, range(self.num_qubits))
+        U_k.append(U_k_1, range(self.num_qubits))
         
         return U_k
     

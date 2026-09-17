@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from qiskit import QuantumCircuit
+from qiskit.quantum_info import SparsePauliOp
 
 from .utils import to_sparse_pauli
 
@@ -11,11 +12,26 @@ class DB_Base(ABC):
         time_step (float | list[float]): The time step(s) for the evolution.
         trotterization (bool): Whether to use Trotterization.
         initial_state (qiskit.QuantumCircuit | None): The circuit that prepares the initial state of the system.
+        measure (bool): Whether to measure the final state.
+        evolution_oracle (qiskit.QuantumCircuit | None): The oracle for the evolution (exp(-is^.5H)).
+        diagonal_oracle (qiskit.QuantumCircuit | None): The oracle for D evolution (exp(-is^.5D)).
+        hadamard_basis (bool): Whether to use the Hadamard basis. Defaults to False.
+        num_qubits (int): The number of qubits in the system.
     """
 
     _multiple_s = True
 
-    def __init__(self, hamiltonian, time_step, trotterization=True, measure=False, initial_state=None):
+    def __init__(
+        self,
+        hamiltonian=None,
+        time_step=None,
+        trotterization=True,
+        measure=False,
+        initial_state=None,
+        evolution_oracle=None,
+        diagonal_oracle=None,
+        hadamard_basis=False,
+    ):
         """Initialize the DB_Base class.
 
         Args:
@@ -24,13 +40,26 @@ class DB_Base(ABC):
             trotterization (bool, optional): Whether to use Trotterization. Defaults to True.
             measure (bool, optional): Whether to measure the final state. Defaults to False.
             initial_state (qiskit.QuantumCircuit | None, optional): The circuit that prepares the initial state of the system. If None, the initial state will be |0>^n . Defaults to None.
+            evolution_oracle (qiskit.QuantumCircuit | None, optional): The oracle for the evolution (exp(-is^.5H)). Defaults to None.
+            diagonal_oracle (qiskit.QuantumCircuit | None, optional): The oracle for D evolution (exp(-is^.5D)). Defaults to None.
+            hadamard_basis (bool, optional): Whether to use the Hadamard basis. Defaults to False.
         """
 
+        assert hamiltonian or evolution_oracle, "Either hamiltonian or evolution_oracle must be provided"
+        if hamiltonian is not None:
+            self.hamiltonian = to_sparse_pauli(hamiltonian, convert=trotterization)
+            self.num_qubits = self.num_qubits
+        else:
+            self.hamiltonian = None
+            self.num_qubits = evolution_oracle.num_qubits
+
         self.trotterization = trotterization
-        self.hamiltonian = to_sparse_pauli(hamiltonian, convert=trotterization)
         self.initial_state = initial_state
         self.time_step = time_step
         self.measure = measure
+        self.evolution_oracle = evolution_oracle
+        self.diagonal_oracle = diagonal_oracle
+        self.hadamard_basis = hadamard_basis
         if isinstance(time_step, float):
             self._multiple_s = False
             self.e_is, self.e_P0 = self._create_auxiliary_gates(time_step)
@@ -74,6 +103,10 @@ class DB_Base(ABC):
             e_is, e_P0 = self.e_is, self.e_P0
         else:
             e_is, e_P0 = self._create_auxiliary_gates(current_s)
+        
+        # oracles override:
+        e_is = self.evolution_oracle if self.evolution_oracle is not None else e_is
+        e_P0 = self.diagonal_oracle if self.diagonal_oracle is not None else e_P0
 
         return e_is, e_P0
     
@@ -88,12 +121,13 @@ class DB_Base(ABC):
             qiskit.QuantumCircuit: The initial unitary U_0.
         """
 
-        U0 = QuantumCircuit(self.hamiltonian.num_qubits)
+        U0 = QuantumCircuit(self.num_qubits)
+
         if self.initial_state is not None:
             assert isinstance(self.initial_state, QuantumCircuit), "initial_state must be a quantum circuit"
             U0 = self.initial_state
         else:
-            U0.id(range(self.hamiltonian.num_qubits))
+            U0.id(range(self.num_qubits))
         return U0
 
     @abstractmethod
@@ -112,10 +146,13 @@ class DB_Base(ABC):
         
         U_k = self.create_U_k(num_steps)
         total_qubits = U_k.num_qubits
-        circuit = QuantumCircuit(total_qubits, self.hamiltonian.num_qubits)
+        H_qubits = self.num_qubits
+        circuit = QuantumCircuit(total_qubits, H_qubits)
+        if self.hadamard_basis:
+            circuit.h(range(H_qubits))
         circuit.append(U_k, range(total_qubits))
         if self.measure:
-            circuit.measure(range(self.hamiltonian.num_qubits), range(self.hamiltonian.num_qubits))
+            circuit.measure(range(self.num_qubits), range(self.num_qubits))
         
         return circuit
 

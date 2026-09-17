@@ -137,10 +137,8 @@ class CircuitRunner:
     
     def _run_Z_measurement(self):
         self.jobs = self.sampler.run(self.circuits, shots=self.default_shots)
-        if self.simulation:
-            self.results = [result.data.counts for result in self.jobs.result().results]
-        else:
-            self.results = [result.data.c.get_counts() for result in self.jobs.result()]
+        self.results = [result.data.c.get_counts() for result in self.jobs.result()]
+        
         return self.results
     
     def run(self):
@@ -185,10 +183,13 @@ class CircuitRunner:
 
 
 def db_range_runner(
-    hamiltonian,
-    time_step,
-    num_steps_range,
+    hamiltonian=None,
+    time_step=.5,
+    num_steps_range=[1],
     initial_state=None,
+    evolution_oracle=None,
+    diagonal_oracle=None,
+    hadamard_basis=False,
     backend="simulator",
     estimate_energy=True,
     shots=1024,
@@ -203,6 +204,9 @@ def db_range_runner(
         time_step (float|list[float]): The time step(s) for the evolution.
         num_steps_range (list[int]): A list of number of steps to run.
         initial_state (qiskit.QuantumCircuit): The circuit to prepare the initial state for the circuit.
+        evolution_oracle (qiskit.QuantumCircuit | None): The oracle for the evolution (exp(-is^.5H)).
+        diagonal_oracle (qiskit.QuantumCircuit | None): The oracle for D evolution (exp(-is^.5D)).
+        hadamard_basis (bool): Whether to use the Hadamard basis. Defaults to False.
         backend (str | qiskit.BaseBackend | None): The backend to use for simulation. If None, the least busy backend will be used. If "simulator", the proper simulator will be used.
         estimate_energy (bool): Whether to estimate the energy or measure the final state.
         shots (int): The number of shots for each measurement.
@@ -227,7 +231,7 @@ def db_range_runner(
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # heatmap of the hamiltonian if the number of qubits is small enough
-    if hamiltonian.num_qubits <= 10:
+    if hamiltonian and hamiltonian.num_qubits <= 10:
         plt.imshow(np.abs(Operator(hamiltonian).data), cmap='viridis')
         plt.colorbar()
         plt.title("Hamiltonian Matrix")
@@ -236,7 +240,16 @@ def db_range_runner(
 
     circuits = []
     for num_steps in num_steps_range:
-        db_circuit = db_class(hamiltonian, time_step, trotterization=trotterization, measure=measure, initial_state=initial_state)
+        db_circuit = db_class(
+            hamiltonian,
+            time_step,
+            trotterization=trotterization,
+            measure=measure,
+            initial_state=initial_state,
+            evolution_oracle=evolution_oracle,
+            diagonal_oracle=diagonal_oracle,
+            hadamard_basis=hadamard_basis
+        )
         circuit = db_circuit.create_circuit(num_steps)
         circuit.name = f"{method}_{num_steps}_steps"
         circuit.decompose().draw('mpl', filename=f'{output_dir}/{method}_{num_steps}_steps.png')
