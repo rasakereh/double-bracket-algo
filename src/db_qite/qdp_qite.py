@@ -29,7 +29,7 @@ class QDP_QITE(DB_Base):
         e_is, _ = self.get_auxiliary_gates(s, k)
         current_s = self.get_curr_s(s, k)
 
-        num_qubits = self.hamiltonian.num_qubits
+        num_qubits = self.num_qubits
 
         U_k_1 = self.create_U_k(k - 1, s).to_gate(label=f'$U_{k-1}$')
         e_is_inverse = e_is.inverse()
