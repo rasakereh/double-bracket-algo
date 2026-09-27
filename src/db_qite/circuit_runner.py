@@ -5,6 +5,7 @@ from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, EstimatorV2 as Est
 from qiskit.converters import circuit_to_dag
 from qiskit.visualization import plot_histogram
 
+from functools import reduce
 import numpy as np
 import os
 import pathlib
@@ -34,6 +35,8 @@ def get_ibm_runtime():
         raise ValueError("Set IBM_QUANTUM_TOKEN environment variable to your API key")
 
 class CircuitRunner:
+    """You can batch run the circuits with the same H and number of qubits using this class"""
+
     def __init__(self, circuits, backend, estimate_energy, default_shots, hamiltonian=None, output_dir='outputs'):
         # backend can be "simulator" a string name for qiskit backend or an actual backend object, None (we find the backend automatically)
         self.estimate_energy = estimate_energy
@@ -42,10 +45,22 @@ class CircuitRunner:
         self.hamiltonian = hamiltonian
         self.output_dir = output_dir
         pathlib.Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-        self.initial_circuits = circuits
+        self.circuit_partitions = {circuit_group: len(circuits[circuit_group]) for circuit_group in circuits}
+        self.initial_circuits = reduce(
+            lambda x, y: x + y,
+            circuits.values(),
+            []
+        )
         self.default_shots = default_shots
         self.prepare_runtime(backend)
         self.transpile_circuits()
+    
+    def _find_circuit_partition(self, circuit_idx): #TODO: we can just store ranges
+        total = 0
+        for circuit_group, group_size in self.circuit_partitions.items():
+            total += group_size
+            if total > circuit_idx:
+                return circuit_group
     
     def prepare_runtime(self, backend):
         if backend != "simulator":
@@ -101,7 +116,8 @@ class CircuitRunner:
             print(f"Circuit {circuit.name} transpiled for backend {self.backend.name} with depth {circuit.depth()}, num_qubits {self._get_active_qubit_count(circuit)}, and size {circuit.size()}")
             if circuit.size() < 500:
                 circuit_to_draw = circuit#.decompose() if self.simulation else circuit
-                circuit_to_draw.draw('mpl', filename=f'{self.output_dir}/transpiled_circuit_{i}.png')
+                circuit_group = self._find_circuit_partition(i)
+                circuit_to_draw.draw('mpl', filename=f'{self.output_dir}/transpiled_circuit_{circuit_group}_{i}.png')
                 plt.close()
     
     def _prepare_estimator_circuit(self, circuit_idx):
@@ -124,22 +140,33 @@ class CircuitRunner:
             optimization_level=3,
             approximation_degree=1 if self.simulation else .999
         )
+    
+    def _partition_results(self, results):
+        self.results = {}
+        offset = 0
+        for circuit_group in self.circuit_partitions:
+            self.results[circuit_group] = results[
+                offset:(offset+self.circuit_partitions[circuit_group])
+            ]
+            offset += self.circuit_partitions[circuit_group]
+        
+        return self.results
 
     def _run_estimate_energy(self):
         jobs_to_submiut = [self._prepare_estimator_circuit(idx) for idx, _ in enumerate(self.circuits)]
         self.jobs = self.estimator.run(jobs_to_submiut)
-        self.results = [
+        results = [
             (float(res.data.evs), float(res.data.stds))
             for res in self.jobs.result()
         ]
 
-        return self.results
+        return self._partition_results(results)
     
     def _run_Z_measurement(self):
         self.jobs = self.sampler.run(self.circuits, shots=self.default_shots)
-        self.results = [result.data.c.get_counts() for result in self.jobs.result()]
+        results = [result.data.c.get_counts() for result in self.jobs.result()]
         
-        return self.results
+        return self._partition_results(results)
     
     def run(self):
         if self.estimate_energy:
@@ -152,14 +179,16 @@ class CircuitRunner:
 
         ground_state_energy = self.eigenvalues[0]
 
-        energies = [res[0] for res in self.results]
-        stds = [res[1] for res in self.results]
-        plt.errorbar(range(len(energies)), energies, yerr=stds, fmt='o-', ecolor='red', capsize=5)
+        for circuit_group, result_group in self.results.items():
+            energies = [res[0] for res in result_group]
+            stds = [res[1] for res in result_group]
+            plt.errorbar(range(len(energies)), energies, yerr=stds, fmt='o-', ecolor='red', capsize=5, label=circuit_group)
+
         plt.axhline(ground_state_energy, color='green', linestyle='--', label='Ground State Energy')
         for energy_level in self.eigenvalues[1:]:
             plt.axhline(energy_level, color='gray', linestyle='dotted', alpha=0.5)
         plt.legend()
-        plt.xticks(range(len(energies)), [circuit.name for circuit in self.circuits], rotation=45)
+        plt.xticks(range(len(energies)), [circuit.name for circuit in self.circuits[:len(energies)]], rotation=45)
         plt.xlabel('Circuit')
         plt.ylabel('Estimated Energy')
         plt.title('Energy Estimates with Standard Deviation')
@@ -169,11 +198,14 @@ class CircuitRunner:
         plt.close()
     
     def _draw_Z_measurement(self):
-        for i, result in enumerate(self.results):
-            name = self.circuits[i].name
-            plot_histogram(result, title=f"Results for {name}")
-            plt.savefig(f'{self.output_dir}/results_{name}.png')
-            plt.close()
+        i = 0
+        for circuit_group in self.results:
+            for result in self.results[circuit_group]:
+                name = self.circuits[i].name
+                plot_histogram(result, title=f"Results for {name}")
+                plt.savefig(f'{self.output_dir}/results_{circuit_group}::{name}.png')
+                plt.close()
+                i += 1
     
     def draw_results(self):
         if self.estimate_energy:
@@ -205,7 +237,7 @@ def db_range_runner(
         num_steps_range (list[int]): A list of number of steps to run.
         initial_state (qiskit.QuantumCircuit): The circuit to prepare the initial state for the circuit.
         evolution_oracle (qiskit.QuantumCircuit | None): The oracle for the evolution (exp(-is^.5H)).
-        diagonal_oracle (qiskit.QuantumCircuit | None): The oracle for D evolution (exp(-is^.5D)).
+        diagonal_oracle (qiskit.QuantumCircuit | dict(str, qiskit.QuantumCircuit) | None): The oracle for D evolution (exp(-is^.5D)). List can be provided to compare different oracles
         hadamard_basis (bool): Whether to use the Hadamard basis. Defaults to False.
         backend (str | qiskit.BaseBackend | None): The backend to use for simulation. If None, the least busy backend will be used. If "simulator", the proper simulator will be used.
         estimate_energy (bool): Whether to estimate the energy or measure the final state.
@@ -223,6 +255,12 @@ def db_range_runner(
         "qdp_qite": QDP_QITE
     }[method]
 
+    db_name = {
+        "db_qite": "DB-QITE",
+        "db_sorter": "DB-Sorter",
+        "qdp_qite": "QDP-QITE"
+    }
+
     trotterization = False if backend == "simulator" else True
     if method == "qdp_qite":
         trotterization = True
@@ -238,23 +276,29 @@ def db_range_runner(
         plt.savefig(f'{output_dir}/hamiltonian_matrix.png')
         plt.close()
 
-    circuits = []
-    for num_steps in num_steps_range:
-        db_circuit = db_class(
-            hamiltonian,
-            time_step,
-            trotterization=trotterization,
-            measure=measure,
-            initial_state=initial_state,
-            evolution_oracle=evolution_oracle,
-            diagonal_oracle=diagonal_oracle,
-            hadamard_basis=hadamard_basis
-        )
-        circuit = db_circuit.create_circuit(num_steps)
-        circuit.name = f"{method}_{num_steps}_steps"
-        circuit.decompose().draw('mpl', filename=f'{output_dir}/{method}_{num_steps}_steps.png')
-        plt.close()
-        circuits.append(circuit)
+    circuits = {}
+    if not diagonal_oracle or not isinstance(diagonal_oracle, dict):
+        circuit_partitions = {db_name[method]: diagonal_oracle}
+    else:
+        circuit_partitions = {oracle_name: d_oracle for oracle_name, d_oracle in diagonal_oracle.items()}
+    for partition_name, d_oracle in circuit_partitions.items():
+        circuits[partition_name] = []
+        for num_steps in num_steps_range:
+            db_circuit = db_class(
+                hamiltonian,
+                time_step,
+                trotterization=trotterization,
+                measure=measure,
+                initial_state=initial_state,
+                evolution_oracle=evolution_oracle,
+                diagonal_oracle=d_oracle,
+                hadamard_basis=hadamard_basis
+            )
+            circuit = db_circuit.create_circuit(num_steps)
+            circuit.name = f"{method}_{num_steps}_steps"
+            circuit.decompose().draw('mpl', filename=f'{output_dir}/{partition_name}_{num_steps}_steps.png')
+            plt.close()
+            circuits[partition_name].append(circuit)
 
     runner = CircuitRunner(circuits, backend, estimate_energy, shots, hamiltonian, output_dir=output_dir)
 

@@ -41,9 +41,8 @@ def create_zero_projection_gate(s, num_qubits, use_mcp=True, ascending=False, ha
         return projection_gate
 
 def create_monotonic_diagonal(s, num_qubits, ascending=True, hadamard_basis=False):
-    phases = [np.pi/2*s**0.5/(2**i) for i in range(num_qubits)]
-    if ascending:
-        phases = phases[::-1]
+    sign = 1 if ascending else -1
+    phases = [sign * np.pi/2 * s**0.5/(2**i) for i in range(num_qubits)]
     monotonic_circuit = QuantumCircuit(num_qubits)
     if hadamard_basis:
         monotonic_circuit.h(range(num_qubits))
@@ -54,6 +53,26 @@ def create_monotonic_diagonal(s, num_qubits, ascending=True, hadamard_basis=Fals
     monotonic_gate = monotonic_circuit.to_gate(label='MonotonicDiagonal')
 
     return monotonic_gate
+
+def create_select_k(s, num_qubits, k=0, ascending=True, hadamard_basis=False):
+    assert k < 2**num_qubits, "k should be smaller than 2^num_qubits"
+    sign = 1 if ascending else -1
+    binary_k = list(reversed(bin(k)[2:]))
+    if len(binary_k) < num_qubits:
+        binary_k.extend(['0' for _ in range(len(binary_k), num_qubits)])
+    k_sign = [sign if k_i == '0' else -sign for k_i in binary_k]
+    phases = [k_i * np.pi * s**0.5/(num_qubits+1) for k_i in k_sign]
+    select_k_circuit = QuantumCircuit(num_qubits)
+    if hadamard_basis:
+        select_k_circuit.h(range(num_qubits))
+    for i in range(num_qubits):
+        select_k_circuit.p(phases[i], i)
+    if hadamard_basis:
+        select_k_circuit.h(range(num_qubits))
+    select_k_gate = select_k_circuit.to_gate(label='SelectKDiagonal')
+
+    return select_k_gate
+
 
 def to_sparse_pauli(H, convert):
     if isinstance(H, (SparsePauliOp, Pauli)) or not convert:

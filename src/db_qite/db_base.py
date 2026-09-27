@@ -48,7 +48,7 @@ class DB_Base(ABC):
         assert hamiltonian or evolution_oracle, "Either hamiltonian or evolution_oracle must be provided"
         if hamiltonian is not None:
             self.hamiltonian = to_sparse_pauli(hamiltonian, convert=trotterization)
-            self.num_qubits = self.num_qubits
+            self.num_qubits = self.hamiltonian.num_qubits
         else:
             self.hamiltonian = None
             self.num_qubits = evolution_oracle.num_qubits
