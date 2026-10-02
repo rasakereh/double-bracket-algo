@@ -1,8 +1,10 @@
 # you need `pip install  qiskit-nature pyscf` for this
+from qiskit import QuantumCircuit
 
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
+import gc
 
 from db_qite import db_range_runner, DB_Insight
 from db_qite.utils import create_zero_projection_gate, create_select_k, create_monotonic_diagonal
@@ -74,38 +76,62 @@ print(NH3.size, NH3.num_qubits)
 
 # exit()
 
-num_qubits = 6
-delta = .5
-H_XXZ = SparsePauliOp.from_sparse_list(
-    [('XX', [i, i+1], 1) for i in range(num_qubits-1)] + \
-    [('YY', [i, i+1], 1) for i in range(num_qubits-1)] + \
-    [('ZZ', [i, i+1], delta) for i in range(num_qubits-1)],
+num_qubits = 8
+J = .5
+H_TFIM = SparsePauliOp.from_sparse_list(
+    [('ZZ', [i, i+1], .5) for i in range(num_qubits-1)] + \
+    [('X', [i], .5) for i in range(num_qubits)],
     num_qubits=num_qubits
 )
 
-num_qubits = 6
-J2_J1 = .5
-H_J1_J2 = SparsePauliOp.from_sparse_list(
-    [('XX', [i, i+1], 1) for i in range(num_qubits-1)] + \
-    [('YY', [i, i+1], 1) for i in range(num_qubits-1)] + \
-    [('ZZ', [i, i+1], 1) for i in range(num_qubits-1)] + \
-    [('XX', [i, i+2], J2_J1) for i in range(num_qubits-2)] + \
-    [('YY', [i, i+2], J2_J1) for i in range(num_qubits-2)] + \
-    [('ZZ', [i, i+2], J2_J1) for i in range(num_qubits-2)],
+
+num_qubits = 8
+delta = .5
+H_XXZ = SparsePauliOp.from_sparse_list(
+    [('XX', [i, i+1], .5) for i in range(num_qubits-1)] + \
+    [('YY', [i, i+1], .5) for i in range(num_qubits-1)] + \
+    [('ZZ', [i, i+1], .5*delta) for i in range(num_qubits-1)],
     num_qubits=num_qubits
 )
+
+num_qubits = 8
+J2_J1 = .5
+H_J1_J2 = SparsePauliOp.from_sparse_list(
+    [('XX', [i, i+1], .5) for i in range(num_qubits-1)] + \
+    [('YY', [i, i+1], .5) for i in range(num_qubits-1)] + \
+    [('ZZ', [i, i+1], .5) for i in range(num_qubits-1)] + \
+    [('XX', [i, i+2], .5*J2_J1) for i in range(num_qubits-2)] + \
+    [('YY', [i, i+2], .5*J2_J1) for i in range(num_qubits-2)] + \
+    [('ZZ', [i, i+2], .5*J2_J1) for i in range(num_qubits-2)],
+    num_qubits=num_qubits
+)
+
+custom_basis = QuantumCircuit(num_qubits)
+np.random.seed(42)
+for i in range(num_qubits):
+    custom_basis.h(i)
+    custom_basis.p(
+        np.random.choice([1/3, 1/4, 1/5, 1/6]) * np.pi * np.random.choice([-1, 1]),
+        i
+    )
+    if i>1 and np.random.choice([True, False], p=[.25, .75]):
+        custom_basis.cx(i-1, i)
+print(custom_basis)
 
 
 ##########################################
 
-for toy_model, H in zip(["H2", "NH3", "H_XXZ", "H_J1_J2"], [H2, NH3, H_XXZ, H_J1_J2]):
+for toy_model, H in zip(["H_TFIM", "H_XXZ", "H_J1_J2", "H2", "NH3"], [H_TFIM, H_XXZ, H_J1_J2, H2, NH3]):
+    gc.collect()
     print(f"processing {toy_model}")
     n_qubit = H.num_qubits
     s = .5
 
-    zero_projection_oracle = create_zero_projection_gate(s=s, num_qubits=n_qubit, use_mcp=True, ascending=True, hadamard_basis=True)
-    monotonic_oracle = create_monotonic_diagonal(s=s, num_qubits=n_qubit, ascending=True, hadamard_basis=True)
-    select_k_oracle = create_select_k(s=s, num_qubits=n_qubit, ascending=True, hadamard_basis=True)
+    hadamard_basis = toy_model in ["H2", "NH3"] 
+
+    zero_projection_oracle = create_zero_projection_gate(s=s, num_qubits=n_qubit, use_mcp=True, ascending=True, hadamard_basis=hadamard_basis, custom_basis=custom_basis if not hadamard_basis else None)
+    monotonic_oracle = create_monotonic_diagonal(s=s, num_qubits=n_qubit, ascending=True, hadamard_basis=hadamard_basis, custom_basis=custom_basis if not hadamard_basis else None)
+    select_k_oracle = create_select_k(s=s, num_qubits=n_qubit, ascending=True, hadamard_basis=hadamard_basis, custom_basis=custom_basis if not hadamard_basis else None)
 
     diagonal_oracles = {
         "I - 2|0><0|": zero_projection_oracle,
@@ -118,7 +144,8 @@ for toy_model, H in zip(["H2", "NH3", "H_XXZ", "H_J1_J2"], [H2, NH3, H_XXZ, H_J1
         initial_state=None,
         time_step=s,
         diagonal_oracle=diagonal_oracles,
-        hadamard_basis=True,
+        hadamard_basis=hadamard_basis,
+        custom_basis=custom_basis if not hadamard_basis else None,
         num_steps_range=[0, 1, 2, 3] if n_qubit > 4 else [0, 1, 2, 3, 4],
         backend="simulator",
         estimate_energy=True,
