@@ -19,7 +19,7 @@ class DB_Sorter(DB_Base):
 
     def _create_auxiliary_gates(self, s):
         e_is = create_evolution_gate(s, self.hamiltonian, use_pauli=self.trotterization)
-        e_P0 = create_monotonic_diagonal(s, self.num_qubits, hadamard_basis=self.hadamard_basis)
+        e_P0 = create_monotonic_diagonal(s, self.num_qubits, hadamard_basis=False, custom_basis=self.custom_basis)
 
         return e_is, e_P0
 

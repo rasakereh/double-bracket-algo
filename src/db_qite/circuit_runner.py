@@ -91,7 +91,9 @@ class CircuitRunner:
     def result_by_eigensolver(self):
         if self.hamiltonian is None:
             raise ValueError("Hamiltonian must be provided to compute eigenvalues and eigenvectors")
-        eigenvals, eigvecs = np.linalg.eigh(Operator(self.hamiltonian).data)
+        
+        hamiltonian_mat = Operator(self.hamiltonian).data
+        eigenvals, eigvecs = np.linalg.eigh(hamiltonian_mat)
         self.eigenvalues = eigenvals
         self.eigenvectors = eigvecs
 
@@ -101,8 +103,12 @@ class CircuitRunner:
                 print(f"closest state: |{np.argmax(np.abs(eigvec))}>")
                 print(f"~Eigenvector: {np.abs(eigvec)}\n")
             print("-" * 40)
+        
+        n = hamiltonian_mat.shape[0]
+        uniform_state = np.array([[1/np.sqrt(n)] for _ in range(n)], dtype=np.complex128)
+        self.uniform_state_energy = np.real(np.vdot(uniform_state, hamiltonian_mat @ uniform_state))
 
-        return self.eigenvalues, self.eigenvectors
+        return self.eigenvalues, self.eigenvectors, self.uniform_state_energy
     
     @staticmethod
     def _get_active_qubit_count(circuit):
@@ -185,6 +191,7 @@ class CircuitRunner:
             plt.errorbar(range(len(energies)), energies, yerr=stds, fmt='o-', ecolor='red', capsize=5, label=circuit_group)
 
         plt.axhline(ground_state_energy, color='green', linestyle='--', label='Ground State Energy')
+        plt.axhline(self.uniform_state_energy, color='red', linestyle='--', label='Uniform State Energy')
         for energy_level in self.eigenvalues[1:]:
             plt.axhline(energy_level, color='gray', linestyle='dotted', alpha=0.5)
         plt.legend()
@@ -222,6 +229,7 @@ def db_range_runner(
     evolution_oracle=None,
     diagonal_oracle=None,
     hadamard_basis=False,
+    custom_basis=None,
     backend="simulator",
     estimate_energy=True,
     shots=1024,
@@ -239,6 +247,7 @@ def db_range_runner(
         evolution_oracle (qiskit.QuantumCircuit | None): The oracle for the evolution (exp(-is^.5H)).
         diagonal_oracle (qiskit.QuantumCircuit | dict(str, qiskit.QuantumCircuit) | None): The oracle for D evolution (exp(-is^.5D)). List can be provided to compare different oracles
         hadamard_basis (bool): Whether to use the Hadamard basis. Defaults to False.
+        custom_basis (qiskit.QuantumCircuit | None): A custom basis to the diagonalization in. if input is U, it will hold D = U(diag)U* and input would be U|k> instead of |k>.
         backend (str | qiskit.BaseBackend | None): The backend to use for simulation. If None, the least busy backend will be used. If "simulator", the proper simulator will be used.
         estimate_energy (bool): Whether to estimate the energy or measure the final state.
         shots (int): The number of shots for each measurement.
@@ -292,7 +301,8 @@ def db_range_runner(
                 initial_state=initial_state,
                 evolution_oracle=evolution_oracle,
                 diagonal_oracle=d_oracle,
-                hadamard_basis=hadamard_basis
+                hadamard_basis=hadamard_basis,
+                custom_basis=custom_basis
             )
             circuit = db_circuit.create_circuit(num_steps)
             circuit.name = f"{method}_{num_steps}_steps"

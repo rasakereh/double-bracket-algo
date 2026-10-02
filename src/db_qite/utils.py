@@ -16,19 +16,22 @@ def create_evolution_gate(s, H, use_pauli=True):
     else:
         return HamiltonianGate(H, time=-s**0.5, label='$e^{i\\sqrt{s}H}$')
 
-def create_zero_projection_gate(s, num_qubits, use_mcp=True, ascending=False, hadamard_basis=False):
+def create_zero_projection_gate(s, num_qubits, use_mcp=True, ascending=False, hadamard_basis=False, custom_basis=None):
     if use_mcp:
-        projection_circuit = QuantumCircuit(num_qubits)
         if hadamard_basis:
-            projection_circuit.h(range(num_qubits))
+            custom_basis = QuantumCircuit(num_qubits)
+            custom_basis.h(range(num_qubits))
+        projection_circuit = QuantumCircuit(num_qubits)
+        if custom_basis:
+            projection_circuit.compose(custom_basis.inverse(), qubits=range(num_qubits), inplace=True)
         for i in range(num_qubits):
             projection_circuit.x(i)
         time_step = s**0.5 if not ascending else -s**0.5
         projection_circuit.mcp(time_step, [0], range(1, num_qubits))  # Control qubits first, then target
         for i in range(num_qubits):
             projection_circuit.x(i)
-        if hadamard_basis:
-            projection_circuit.h(range(num_qubits))
+        if custom_basis:
+            projection_circuit.compose(custom_basis, qubits=range(num_qubits), inplace=True)
         projection_circuit.name = f"projection_circuit"
         projection_gate = projection_circuit.to_gate(label='$e^{i\\sqrt{s}|0><0|}$')
         return projection_gate
@@ -40,22 +43,31 @@ def create_zero_projection_gate(s, num_qubits, use_mcp=True, ascending=False, ha
         projection_gate = HamiltonianGate(P0, time=-s**0.5, label='$e^{i\\sqrt{s}|0><0|}$')
         return projection_gate
 
-def create_monotonic_diagonal(s, num_qubits, ascending=True, hadamard_basis=False):
+def create_monotonic_diagonal(s, num_qubits, ascending=True, hadamard_basis=False, custom_basis=None):
+    if hadamard_basis:
+        custom_basis = QuantumCircuit(num_qubits)
+        custom_basis.h(range(num_qubits))
+            
     sign = 1 if ascending else -1
     phases = [sign * np.pi/2 * s**0.5/(2**i) for i in range(num_qubits)]
     monotonic_circuit = QuantumCircuit(num_qubits)
-    if hadamard_basis:
-        monotonic_circuit.h(range(num_qubits))
+    if custom_basis:
+        monotonic_circuit.compose(custom_basis.inverse(), qubits=range(num_qubits), inplace=True)
     for i in range(num_qubits):
         monotonic_circuit.p(phases[i], i)
-    if hadamard_basis:
-        monotonic_circuit.h(range(num_qubits))
+    if custom_basis:
+        monotonic_circuit.compose(custom_basis, qubits=range(num_qubits), inplace=True)
     monotonic_gate = monotonic_circuit.to_gate(label='MonotonicDiagonal')
 
     return monotonic_gate
 
-def create_select_k(s, num_qubits, k=0, ascending=True, hadamard_basis=False):
+def create_select_k(s, num_qubits, k=0, ascending=True, hadamard_basis=False, custom_basis=None):
     assert k < 2**num_qubits, "k should be smaller than 2^num_qubits"
+    
+    if hadamard_basis:
+        custom_basis = QuantumCircuit(num_qubits)
+        custom_basis.h(range(num_qubits))
+
     sign = 1 if ascending else -1
     binary_k = list(reversed(bin(k)[2:]))
     if len(binary_k) < num_qubits:
@@ -63,12 +75,12 @@ def create_select_k(s, num_qubits, k=0, ascending=True, hadamard_basis=False):
     k_sign = [sign if k_i == '0' else -sign for k_i in binary_k]
     phases = [k_i * np.pi * s**0.5/(num_qubits+1) for k_i in k_sign]
     select_k_circuit = QuantumCircuit(num_qubits)
-    if hadamard_basis:
-        select_k_circuit.h(range(num_qubits))
+    if custom_basis:
+        select_k_circuit.compose(custom_basis.inverse(), qubits=range(num_qubits), inplace=True)
     for i in range(num_qubits):
         select_k_circuit.p(phases[i], i)
-    if hadamard_basis:
-        select_k_circuit.h(range(num_qubits))
+    if custom_basis:
+        select_k_circuit.compose(custom_basis, qubits=range(num_qubits), inplace=True)
     select_k_gate = select_k_circuit.to_gate(label='SelectKDiagonal')
 
     return select_k_gate

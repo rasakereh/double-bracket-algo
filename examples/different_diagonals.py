@@ -1,5 +1,6 @@
 # you need `pip install  qiskit-nature pyscf` for this
 
+from qiskit.quantum_info import SparsePauliOp
 from qiskit_nature.second_q.drivers import PySCFDriver
 from qiskit_nature.second_q.mappers import JordanWignerMapper
 
@@ -73,10 +74,32 @@ print(NH3.size, NH3.num_qubits)
 
 # exit()
 
+num_qubits = 6
+delta = .5
+H_XXZ = SparsePauliOp.from_sparse_list(
+    [('XX', [i, i+1], 1) for i in range(num_qubits-1)] + \
+    [('YY', [i, i+1], 1) for i in range(num_qubits-1)] + \
+    [('ZZ', [i, i+1], delta) for i in range(num_qubits-1)],
+    num_qubits=num_qubits
+)
+
+num_qubits = 6
+J2_J1 = .5
+H_J1_J2 = SparsePauliOp.from_sparse_list(
+    [('XX', [i, i+1], 1) for i in range(num_qubits-1)] + \
+    [('YY', [i, i+1], 1) for i in range(num_qubits-1)] + \
+    [('ZZ', [i, i+1], 1) for i in range(num_qubits-1)] + \
+    [('XX', [i, i+2], J2_J1) for i in range(num_qubits-2)] + \
+    [('YY', [i, i+2], J2_J1) for i in range(num_qubits-2)] + \
+    [('ZZ', [i, i+2], J2_J1) for i in range(num_qubits-2)],
+    num_qubits=num_qubits
+)
+
+
 ##########################################
 
-for molecule, H in zip(["H2", "NH3"], [H2, NH3]):
-    print(f"processing {molecule}")
+for toy_model, H in zip(["H2", "NH3", "H_XXZ", "H_J1_J2"], [H2, NH3, H_XXZ, H_J1_J2]):
+    print(f"processing {toy_model}")
     n_qubit = H.num_qubits
     s = .5
 
@@ -101,7 +124,7 @@ for molecule, H in zip(["H2", "NH3"], [H2, NH3]):
         estimate_energy=True,
         shots=1024,
         method="db_sorter",
-        output_dir=f"examples/diagonal_zoo/{molecule}"
+        output_dir=f"examples/diagonal_zoo/{toy_model}"
     )
 
 
