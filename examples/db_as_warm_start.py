@@ -178,7 +178,6 @@ def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=
     select_k_oracle = create_select_k(s=s, num_qubits=num_qubits, ascending=True, custom_basis=custom_basis)
     
     d_oracle = select_k_oracle if d_oracle is None else d_oracle
-    # warm_start_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator")
     warm_start_circuit = None
 
     db_sorter = DB_Sorter(
@@ -187,10 +186,13 @@ def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=
         trotterization=trotterization,
         measure=False,
         custom_basis=custom_basis,
-        warm_start=warm_start_circuit,
         diagonal_oracle=d_oracle
     )
-    return db_sorter.create_circuit(num_steps)
+    db_circuit = db_sorter.create_circuit(num_steps)
+
+    prefixed_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator", prefix_circuit=db_circuit)
+
+    return prefixed_circuit
 
 
 ##########################################
@@ -205,7 +207,7 @@ backend = "simulator"
 
 for h_family, h_generator in hamiltonian_families.items():
     print(f"processing {h_family}")
-    output_dir = f"examples/scaling/{h_family}"
+    output_dir = f"examples/db_as_ws/{h_family}"
 
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
