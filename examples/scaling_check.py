@@ -102,7 +102,7 @@ def evaluate_ground_state_fidelity(h_gen, qc_gen, qubit_counts=[2, 4, 6, 8, 10],
     axs[0, 0].legend(fontsize=11)
     axs[0, 0].set_yscale("log")
 
-    # Right: fidelity error scaled
+    # Right: fidelity scaled
     axs[0, 1].plot(
         qubit_counts,
         fidelity_scaled_vals,
@@ -110,11 +110,11 @@ def evaluate_ground_state_fidelity(h_gen, qc_gen, qubit_counts=[2, 4, 6, 8, 10],
         linestyle="-",
         color="crimson",
         linewidth=2,
-        label=r"Scaled Fidelity Error ($1 - 2^nF$)",
+        label=r"Scaled Fidelity ($2^nF$)",
     )
     axs[0, 1].set_xlabel(r"Number of Qubits ($n$)", fontsize=12)
-    axs[0, 1].set_ylabel("Fidelity Error", fontsize=12)
-    axs[0, 1].set_title("Fidelity Error", fontsize=14)
+    axs[0, 1].set_ylabel("Fidelity Scaled", fontsize=12)
+    axs[0, 1].set_title("Fidelity Scaled", fontsize=14)
     axs[0, 1].set_xticks(qubit_counts)
     axs[0, 1].grid(True, which="both", linestyle="--", alpha=0.6)
     axs[0, 1].legend(fontsize=11)
