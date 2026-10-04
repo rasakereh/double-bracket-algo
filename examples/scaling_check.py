@@ -208,6 +208,7 @@ def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=
     select_k_oracle = create_select_k(s=s, num_qubits=num_qubits, ascending=True, custom_basis=custom_basis)
     
     d_oracle = select_k_oracle if d_oracle is None else d_oracle
+    warm_start_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator")
 
     db_sorter = DB_Sorter(
         hamiltonian,
@@ -215,6 +216,7 @@ def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=
         trotterization=trotterization,
         measure=False,
         custom_basis=custom_basis,
+        warm_start=warm_start_circuit,
         diagonal_oracle=d_oracle
     )
     return db_sorter.create_circuit(num_steps)

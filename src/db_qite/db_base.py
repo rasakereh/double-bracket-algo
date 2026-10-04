@@ -17,6 +17,7 @@ class DB_Base(ABC):
         diagonal_oracle (qiskit.QuantumCircuit | None): The oracle for D evolution (exp(-is^.5D)).
         hadamard_basis (bool): Whether to use the Hadamard basis. Defaults to False.
         custom_basis (qiskit.QuantumCircuit | None): A custom basis to the diagonalization in. if input is U, it will hold D = U(diag)U* and input would be U|k> instead of |k>.
+        warm_start (qiskit.QuantumCircuit | None): A circuit that prepares a warm start state for the evolution. It is U|0> ~= |lambda_0>
         num_qubits (int): The number of qubits in the system.
     """
 
@@ -32,7 +33,8 @@ class DB_Base(ABC):
         evolution_oracle=None,
         diagonal_oracle=None,
         hadamard_basis=False,
-        custom_basis=None
+        custom_basis=None,
+        warm_start=None,
     ):
         """Initialize the DB_Base class.
 
@@ -46,6 +48,7 @@ class DB_Base(ABC):
             diagonal_oracle (qiskit.QuantumCircuit | None, optional): The oracle for D evolution (exp(-is^.5D)). Defaults to None.
             hadamard_basis (bool, optional): Whether to use the Hadamard basis. Defaults to False.
             custom_basis (qiskit.QuantumCircuit | None): A custom basis to the diagonalization in. if input is U, it will hold D = U(diag)U* and input would be U|k> instead of |k>.
+            warm_start (qiskit.QuantumCircuit | None): A circuit that prepares a warm start state for the evolution. It is U|0> ~= |lambda_0>
         """
 
         assert hamiltonian or evolution_oracle, "Either hamiltonian or evolution_oracle must be provided"
@@ -62,6 +65,7 @@ class DB_Base(ABC):
         self.measure = measure
         self.evolution_oracle = evolution_oracle
         self.diagonal_oracle = diagonal_oracle
+        self.warm_start = warm_start
         self.custom_basis = custom_basis
         if hadamard_basis:
             self.custom_basis = QuantumCircuit(self.num_qubits)
@@ -129,9 +133,9 @@ class DB_Base(ABC):
 
         U0 = QuantumCircuit(self.num_qubits)
 
-        if self.initial_state is not None:
-            assert isinstance(self.initial_state, QuantumCircuit), "initial_state must be a quantum circuit"
-            U0 = self.initial_state
+        if self.warm_start is not None:
+            assert isinstance(self.warm_start, QuantumCircuit), "warm_start must be a quantum circuit"
+            U0 = self.warm_start
         else:
             U0.id(range(self.num_qubits))
         return U0
@@ -154,6 +158,8 @@ class DB_Base(ABC):
         total_qubits = U_k.num_qubits
         H_qubits = self.num_qubits
         circuit = QuantumCircuit(total_qubits, H_qubits)
+        if self.initial_state is not None:
+            circuit.compose(self.initial_state, qubits=range(self.num_qubits), inplace=True)
         if self.custom_basis:
             circuit.compose(self.custom_basis, qubits=range(self.num_qubits), inplace=True)
         circuit.append(U_k, range(total_qubits))

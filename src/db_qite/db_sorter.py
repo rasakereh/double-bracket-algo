@@ -31,6 +31,9 @@ class DB_Sorter(DB_Base):
         
         e_P0_inverse = e_P0.inverse()
         e_P0_inverse.label = '$e^{-i\\sqrt{s}|0><0|}$'
+        if self.warm_start is not None:
+            assert isinstance(self.warm_start, QuantumCircuit), "warm_start must be a quantum circuit"
+            ws = self.warm_start.to_gate(label='$U_{ws}$')
 
         U_k_1 = self.create_U_k(k - 1, s).to_gate(label=f'$U_{k-1}$')
         U_k_1_inverse = U_k_1.inverse()
@@ -38,7 +41,11 @@ class DB_Sorter(DB_Base):
         U_k = QuantumCircuit(self.num_qubits)
         U_k.append(e_P0_inverse, range(self.num_qubits))
         U_k.append(U_k_1, range(self.num_qubits))
+        if self.warm_start is not None:
+            U_k.append(ws, range(self.num_qubits))
         U_k.append(e_is, range(self.num_qubits))
+        if self.warm_start is not None:
+            U_k.append(ws.inverse(), range(self.num_qubits))
         U_k.append(U_k_1_inverse, range(self.num_qubits))
         U_k.append(e_P0, range(self.num_qubits))
         U_k.append(U_k_1, range(self.num_qubits))

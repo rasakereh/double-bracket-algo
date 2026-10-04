@@ -226,6 +226,7 @@ def db_range_runner(
     time_step=.5,
     num_steps_range=[1],
     initial_state=None,
+    warm_start=None,
     evolution_oracle=None,
     diagonal_oracle=None,
     hadamard_basis=False,
@@ -244,6 +245,7 @@ def db_range_runner(
         time_step (float|list[float]): The time step(s) for the evolution.
         num_steps_range (list[int]): A list of number of steps to run.
         initial_state (qiskit.QuantumCircuit): The circuit to prepare the initial state for the circuit.
+        warm_start (qiskit.QuantumCircuit): The circuit to prepare a warm start state for the evolution. It is U|0> ~= |lambda_0>
         evolution_oracle (qiskit.QuantumCircuit | None): The oracle for the evolution (exp(-is^.5H)).
         diagonal_oracle (qiskit.QuantumCircuit | dict(str, qiskit.QuantumCircuit) | None): The oracle for D evolution (exp(-is^.5D)). List can be provided to compare different oracles
         hadamard_basis (bool): Whether to use the Hadamard basis. Defaults to False.
@@ -299,6 +301,7 @@ def db_range_runner(
                 trotterization=trotterization,
                 measure=measure,
                 initial_state=initial_state,
+                warm_start=warm_start,
                 evolution_oracle=evolution_oracle,
                 diagonal_oracle=d_oracle,
                 hadamard_basis=hadamard_basis,
