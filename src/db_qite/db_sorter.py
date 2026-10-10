@@ -25,7 +25,7 @@ class DB_Sorter(DB_Base):
 
     def create_U_k(self, k, s=None):
         if k == 0:
-            return self.create_U_0()
+            return self.create_U_0(apply_warm_start=False)
         
         e_is, e_P0 = self.get_auxiliary_gates(s, k)
         

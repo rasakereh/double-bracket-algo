@@ -124,7 +124,7 @@ class DB_Base(ABC):
     def _create_auxiliary_gates(self, s):
         pass
     
-    def create_U_0(self):
+    def create_U_0(self, apply_warm_start=True):
         """Create the initial unitary U_0 for the evolution. If an initial state is provided, it will be used to prepare the initial state of the system. Otherwise, the initial state will be |0>^n.
 
         Returns:
@@ -133,7 +133,7 @@ class DB_Base(ABC):
 
         U0 = QuantumCircuit(self.num_qubits)
 
-        if self.warm_start is not None:
+        if self.warm_start is not None and apply_warm_start:
             assert isinstance(self.warm_start, QuantumCircuit), "warm_start must be a quantum circuit"
             U0 = self.warm_start
         else:
