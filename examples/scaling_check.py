@@ -9,7 +9,7 @@ import pathlib
 
 from db_qite import DB_Sorter
 from db_qite.utils import create_zero_projection_gate, create_select_k, create_monotonic_diagonal
-from db_qite.warm_starts import run_vqe_and_get_circuit
+from db_qite.warm_starts import run_vqe_and_get_circuit, var_qite_ws
 
 
 
@@ -48,9 +48,9 @@ def evaluate_ground_state_fidelity(h_gen, qc_gen, qubit_counts=[2, 4, 6, 8, 10],
     - qc_gen: Function with signature qc_gen(hamiltonian) -> QuantumCircuit
     - qubit_counts: List of qubit counts to evaluate
     """
-    fidelity_errors = []
-    fidelity_scaled_vals = []
-    energy_errors = []
+    fidelity_errors = {}
+    fidelity_scaled_vals = {}
+    energy_errors = {}
 
     for n in qubit_counts:
         # 1. Generate the Hamiltonian for n qubits
@@ -65,74 +65,81 @@ def evaluate_ground_state_fidelity(h_gen, qc_gen, qubit_counts=[2, 4, 6, 8, 10],
         ground_state = Statevector(ground_state_vec)
 
         # 3. Generate the ansatz circuit and apply it to initial state |0...0>
-        qc = qc_gen(hamiltonian)
-        initial_state = Statevector.from_int(0, dims=2**n)
-        prepared_state = initial_state.evolve(qc)
+        qcs = qc_gen(hamiltonian)
 
-        # 4. Calculate fidelity and fidelity error: 1 - F(prepared_state, ground_state)
-        F = state_fidelity(prepared_state, ground_state)
-        error = 1.0 - F
-        fidelity_errors.append(error)
+        for oracle_name, qc in qcs.items():
+            initial_state = Statevector.from_int(0, dims=2**n)
+            prepared_state = initial_state.evolve(qc)
 
-        scaled_fidelity = F * (2**n)
-        fidelity_scaled_vals.append(scaled_fidelity)
+            if oracle_name not in fidelity_errors:
+                fidelity_errors[oracle_name] = []
+                fidelity_scaled_vals[oracle_name] = []
+                energy_errors[oracle_name] = []
 
-        E_prepared = prepared_state.expectation_value(hamiltonian).real
-        energy_error = np.abs((E_prepared - E_0) / E_0)
-        energy_errors.append(energy_error)
-    
+            # 4. Calculate fidelity and fidelity error: 1 - F(prepared_state, ground_state)
+            F = state_fidelity(prepared_state, ground_state)
+            error = 1.0 - F
+            fidelity_errors[oracle_name].append(error)
+
+            scaled_fidelity = F * (2**n)
+            fidelity_scaled_vals[oracle_name].append(scaled_fidelity)
+
+            E_prepared = prepared_state.expectation_value(hamiltonian).real
+            energy_error = np.abs((E_prepared - E_0) / E_0)
+            energy_errors[oracle_name].append(energy_error)
+
     # 5. Plot the results
     fig, axs = plt.subplots(2, 2, figsize=(14, 5))
 
     # Left: fidelity error
-    axs[0, 0].plot(
-        qubit_counts,
-        fidelity_errors,
-        marker="o",
-        linestyle="-",
-        color="crimson",
-        linewidth=2,
-        label=r"Fidelity Error ($1 - F$)",
-    )
+    for oracle_name in fidelity_errors.keys():
+        axs[0, 0].plot(
+            qubit_counts,
+            fidelity_errors[oracle_name],
+            marker="o",
+            linestyle="-",
+            linewidth=2,
+            label=oracle_name,
+        )
     axs[0, 0].set_xlabel(r"Number of Qubits ($n$)", fontsize=12)
     axs[0, 0].set_ylabel("Fidelity Error", fontsize=12)
-    axs[0, 0].set_title("Fidelity Error", fontsize=14)
+    axs[0, 0].set_title(r"Fidelity Error ($1 - F$)", fontsize=14)
     axs[0, 0].set_xticks(qubit_counts)
     axs[0, 0].grid(True, which="both", linestyle="--", alpha=0.6)
     axs[0, 0].legend(fontsize=11)
     axs[0, 0].set_yscale("log")
 
     # Right: fidelity scaled
-    axs[0, 1].plot(
-        qubit_counts,
-        fidelity_scaled_vals,
-        marker="o",
-        linestyle="-",
-        color="crimson",
-        linewidth=2,
-        label=r"Scaled Fidelity ($2^nF$)",
-    )
+    for oracle_name in fidelity_scaled_vals.keys():
+        axs[0, 1].plot(
+            qubit_counts,
+            fidelity_scaled_vals[oracle_name],
+            marker="o",
+            linestyle="-",
+            linewidth=2,
+            label=oracle_name,
+        )
     axs[0, 1].set_xlabel(r"Number of Qubits ($n$)", fontsize=12)
     axs[0, 1].set_ylabel("Fidelity Scaled", fontsize=12)
-    axs[0, 1].set_title("Fidelity Scaled", fontsize=14)
+    axs[0, 1].set_title(r"Fidelity Scaled ($2^nF$)", fontsize=14)
     axs[0, 1].set_xticks(qubit_counts)
     axs[0, 1].grid(True, which="both", linestyle="--", alpha=0.6)
     axs[0, 1].legend(fontsize=11)
     axs[0, 1].set_yscale("log")
 
     # Right: relative energy error
-    axs[1, 0].plot(
-        qubit_counts,
-        energy_errors,
-        marker="s",
-        linestyle="--",
-        color="royalblue",
-        linewidth=2,
-        label=r"Relative Energy Error ($|\frac{E_{\mathrm{prepared}} - E_0}{E_0}|$)",
-    )
+    for oracle_name in energy_errors.keys():
+        axs[1, 0].plot(
+            qubit_counts,
+            energy_errors[oracle_name],
+            marker="s",
+            linestyle="--",
+            linewidth=2,
+            label=oracle_name,
+        )
     axs[1, 0].set_xlabel(r"Number of Qubits ($n$)", fontsize=12)
     axs[1, 0].set_ylabel("Relative Energy Error", fontsize=12)
-    axs[1, 0].set_title("Relative Energy Error", fontsize=14)
+    axs[1, 0].set_title(r"Relative Energy Error ($|\frac{E_{\mathrm{prepared}} - E_0}{E_0}|$)", fontsize=14)
     axs[1, 0].set_xticks(qubit_counts)
     axs[1, 0].grid(True, which="both", linestyle="--", alpha=0.6)
     axs[1, 0].legend(fontsize=11)
@@ -147,7 +154,7 @@ def evaluate_ground_state_fidelity(h_gen, qc_gen, qubit_counts=[2, 4, 6, 8, 10],
 
 
 
-def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=True, d_oracle=None):
+def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=True):
     """Generates a DB_Sorter circuit for a given Hamiltonian.
 
     Parameters:
@@ -172,25 +179,36 @@ def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=
         )
         if i>1 and np.random.choice([True, False], p=[.25, .75]):
             custom_basis.cx(i-1, i)
+    # custom_basis = None
     
     zero_projection_oracle = create_zero_projection_gate(s=s, num_qubits=num_qubits, use_mcp=True, ascending=True, custom_basis=custom_basis)
     monotonic_oracle = create_monotonic_diagonal(s=s, num_qubits=num_qubits, ascending=True, custom_basis=custom_basis)
     select_k_oracle = create_select_k(s=s, num_qubits=num_qubits, ascending=True, custom_basis=custom_basis)
-    
-    d_oracle = select_k_oracle if d_oracle is None else d_oracle
-    # warm_start_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator")
-    warm_start_circuit = None
 
-    db_sorter = DB_Sorter(
-        hamiltonian,
-        s,
-        trotterization=trotterization,
-        measure=False,
-        custom_basis=custom_basis,
-        warm_start=warm_start_circuit,
-        diagonal_oracle=d_oracle
-    )
-    return db_sorter.create_circuit(num_steps)
+    oracels = {
+        "I - 2|0><0|": zero_projection_oracle,
+        "monotonic": monotonic_oracle,
+        "select_k": select_k_oracle
+    }
+    
+    # warm_start_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator")
+    warm_start_circuit = var_qite_ws(hamiltonian)
+
+    circuits = {}
+
+    for oracle_name, d_oracle in oracels.items():
+        db_sorter = DB_Sorter(
+            hamiltonian,
+            s,
+            trotterization=trotterization,
+            measure=False,
+            custom_basis=custom_basis,
+            warm_start=warm_start_circuit,
+            diagonal_oracle=d_oracle
+        )
+        circuits[oracle_name] = db_sorter.create_circuit(num_steps)
+    
+    return circuits
 
 
 ##########################################

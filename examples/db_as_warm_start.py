@@ -9,7 +9,7 @@ import pathlib
 
 from db_qite import DB_Sorter
 from db_qite.utils import create_zero_projection_gate, create_select_k, create_monotonic_diagonal
-from db_qite.warm_starts import run_vqe_and_get_circuit
+from db_qite.warm_starts import run_vqe_and_get_circuit, var_qite_ws
 
 
 
@@ -190,7 +190,8 @@ def db_sorter_circuit_generator(hamiltonian, s=0.5, num_steps=3, trotterization=
     )
     db_circuit = db_sorter.create_circuit(num_steps)
 
-    prefixed_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator", prefix_circuit=db_circuit)
+    # prefixed_circuit = run_vqe_and_get_circuit(hamiltonian, backend_name="simulator", prefix_circuit=db_circuit)
+    prefixed_circuit = var_qite_ws(hamiltonian, prefix_circuit=db_circuit)
 
     return prefixed_circuit
 

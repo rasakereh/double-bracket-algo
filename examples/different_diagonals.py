@@ -8,7 +8,7 @@ import gc
 
 from db_qite import db_range_runner, DB_Insight
 from db_qite.utils import create_zero_projection_gate, create_select_k, create_monotonic_diagonal
-from db_qite.warm_starts import run_vqe_and_get_circuit
+from db_qite.warm_starts import run_vqe_and_get_circuit, var_qite_ws
 
 # Define the hamiltonian (H2 molecule)
 driver = PySCFDriver(atom="H 0 0 0; H 0 0 0.735", basis="sto3g")
@@ -123,7 +123,8 @@ print(custom_basis)
 ##########################################
 
 for toy_model, H in zip(["H_TFIM", "H_XXZ", "H_J1_J2", "H2", "NH3"], [H_TFIM, H_XXZ, H_J1_J2, H2, NH3]):
-    warm_start_circuit = run_vqe_and_get_circuit(H, backend_name="simulator")
+    # warm_start_circuit = run_vqe_and_get_circuit(H, backend_name="simulator")
+    warm_start_circuit = var_qite_ws(H)
     for warm_start in [None, warm_start_circuit]:
         gc.collect()
         print(f"processing {toy_model} {'with warm start' if warm_start else 'with cold start'}")
@@ -137,22 +138,22 @@ for toy_model, H in zip(["H_TFIM", "H_XXZ", "H_J1_J2", "H2", "NH3"], [H_TFIM, H_
             num_qubits=n_qubit,
             use_mcp=True,
             ascending=True,
-            hadamard_basis=hadamard_basis if (not warm_start) else False,
-            custom_basis=custom_basis if (not hadamard_basis) and (not warm_start) else None
+            hadamard_basis=hadamard_basis,
+            custom_basis=custom_basis if (not hadamard_basis) else None
         )
         monotonic_oracle = create_monotonic_diagonal(
             s=s,
             num_qubits=n_qubit,
             ascending=True,
-            hadamard_basis=hadamard_basis if (not warm_start) else False,
-            custom_basis=custom_basis if (not hadamard_basis) and (not warm_start) else None
+            hadamard_basis=hadamard_basis,
+            custom_basis=custom_basis if (not hadamard_basis) else None
         )
         select_k_oracle = create_select_k(
             s=s,
             num_qubits=n_qubit,
             ascending=True,
-            hadamard_basis=hadamard_basis if (not warm_start) else False,
-            custom_basis=custom_basis if (not hadamard_basis) and (not warm_start) else None
+            hadamard_basis=hadamard_basis,
+            custom_basis=custom_basis if (not hadamard_basis) else None
         )
 
         diagonal_oracles = {
@@ -170,8 +171,8 @@ for toy_model, H in zip(["H_TFIM", "H_XXZ", "H_J1_J2", "H2", "NH3"], [H_TFIM, H_
             initial_state=initial_state,
             time_step=s,
             diagonal_oracle=diagonal_oracles,
-            hadamard_basis=hadamard_basis if (not warm_start) else False,
-            custom_basis=custom_basis if (not hadamard_basis) and (not warm_start) else None,
+            hadamard_basis=hadamard_basis,
+            custom_basis=custom_basis if (not hadamard_basis) else None,
             warm_start=warm_start,
             num_steps_range=[0, 1, 2, 3] if n_qubit > 4 else [0, 1, 2, 3, 4],
             backend="simulator",
